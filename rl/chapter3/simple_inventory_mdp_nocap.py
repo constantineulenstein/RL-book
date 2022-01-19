@@ -105,6 +105,7 @@ class SimpleInventoryStochasticPolicy(Policy[InventoryState, int]):
 
 
 if __name__ == '__main__':
+
     user_poisson_lambda = 2.0
     user_holding_cost = 1.0
     user_stockout_cost = 10.0

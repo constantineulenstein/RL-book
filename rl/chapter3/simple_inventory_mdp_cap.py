@@ -64,6 +64,7 @@ class SimpleInventoryMDPCap(FiniteMarkovDecisionProcess[InventoryState, int]):
                     d1[order] = Categorical(sr_probs_dict)
 
                 d[state] = d1
+        print(d)
         return d
 
 
