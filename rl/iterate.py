@@ -55,7 +55,10 @@ def converge(values: Iterator[X], done: Callable[[X, X], bool]) -> Iterator[X]:
 
     yield a
 
+    i = 0
     for b in values:
+        i+=1
+        #print(i)
         yield b
         if done(a, b):
             return
