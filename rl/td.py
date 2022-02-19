@@ -5,7 +5,7 @@ Markov Decision Processes.
 
 from operator import itemgetter
 import itertools
-from typing import Callable, Iterable, Iterator, TypeVar, Set, Sequence, Tuple
+from typing import Callable, Iterable, Iterator, TypeVar, Set, Sequence, Tuple, Mapping
 
 import numpy as np
 
@@ -20,6 +20,7 @@ from rl.markov_decision_process import TransitionStep, NonTerminal
 from rl.monte_carlo import greedy_policy_from_qvf
 from rl.policy import Policy, DeterministicPolicy
 from rl.experience_replay import ExperienceReplayMemory
+from collections import defaultdict
 
 S = TypeVar('S')
 
@@ -51,6 +52,35 @@ def td_prediction(
             transition.reward + γ * extended_vf(v, transition.next_state)
         )])
     return iterate.accumulate(transitions, step, initial=approx_0)
+
+
+
+def td_prediction_tabular(
+        transitions: Iterable[mp.TransitionStep[S]],
+        γ: float
+) -> Iterator[Mapping[S, float]]:
+    '''Evaluate an MRP using TD(0) using the given sequence of
+    transitions.
+
+    Each value this function yields represents the approximated value
+    function for the MRP after an additional transition.
+
+    Arguments:
+      transitions -- a sequence of transitions from an MRP which don't
+                     have to be in order or from the same simulation
+      approx_0 -- initial approximation of value function
+      γ -- discount rate (0 < γ ≤ 1)
+
+    '''
+    mapping = defaultdict(float)
+    counter = defaultdict(int)
+    for step in transitions:
+        state = step.state
+        next_state = step.next_state
+        reward = step.reward
+        mapping[state] += (1/(counter[state] + 1)) * (reward + γ * mapping[next_state] - mapping[state])
+        counter[state] += 1
+        yield mapping
 
 
 def batch_td_prediction(

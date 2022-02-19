@@ -3,7 +3,7 @@ Markov Decision Processes.
 
 '''
 
-from typing import Iterable, Iterator, TypeVar, Callable
+from typing import Iterable, Iterator, TypeVar, Callable, Dict, Sequence, Mapping
 from rl.distribution import Categorical
 from rl.approximate_dynamic_programming import (ValueFunctionApprox,
                                                 QValueFunctionApprox,
@@ -15,6 +15,8 @@ from rl.policy import DeterministicPolicy, RandomPolicy, UniformPolicy
 import rl.markov_process as mp
 from rl.returns import returns
 import itertools
+import numpy as np
+from collections import defaultdict
 
 S = TypeVar('S')
 A = TypeVar('A')
@@ -52,6 +54,43 @@ def mc_prediction(
             [(step.state, step.return_)] for step in episode
         ))
         yield f
+
+
+def mc_prediction_tabular(
+    traces: Iterable[Iterable[mp.TransitionStep[S]]],
+    γ: float,
+    episode_length_tolerance: float = 1e-6
+) -> Iterator[Mapping[S, float]]:
+
+    # episodes: Iterable[mp.ReturnStep[S]] = \
+    #     list(itertools.chain.from_iterable(returns(trace, γ, episode_length_tolerance) for trace in traces))
+    episodes: Iterator[Iterator[mp.ReturnStep[S]]] = \
+        (returns(trace, γ, episode_length_tolerance) for trace in traces)
+    print(episodes)
+    mapping = defaultdict(float)
+    counter = defaultdict(int)
+    for episode in episodes:
+        for s in episode:
+            state = s.state
+            return_ = s.return_
+            mapping[state] += 1/(counter[state]+1)*(return_ - mapping[state])
+            counter[state] += 1
+        yield mapping
+
+
+
+
+    # sorted_returns_seq: Sequence[mp.ReturnStep[S]] = sorted(
+    #     episodes,
+    #     key=mp.ReturnStep[S].state.state
+    # )
+    # return {NonTerminal(s): np.mean([r.return_ for r in l])
+    #         for s, l in itertools.groupby(
+    #         sorted_returns_seq,
+    #         key=mp.ReturnStep[S].state.state
+    #     )}
+
+
 
 
 def batch_mc_prediction(
