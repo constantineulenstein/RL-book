@@ -62,8 +62,6 @@ def mc_prediction_tabular(
     episode_length_tolerance: float = 1e-6
 ) -> Iterator[Mapping[S, float]]:
 
-    # episodes: Iterable[mp.ReturnStep[S]] = \
-    #     list(itertools.chain.from_iterable(returns(trace, γ, episode_length_tolerance) for trace in traces))
     episodes: Iterator[Iterator[mp.ReturnStep[S]]] = \
         (returns(trace, γ, episode_length_tolerance) for trace in traces)
     print(episodes)
