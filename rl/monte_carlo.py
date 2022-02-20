@@ -3,7 +3,7 @@ Markov Decision Processes.
 
 '''
 
-from typing import Iterable, Iterator, TypeVar, Callable, Dict, Sequence, Mapping
+from typing import Iterable, Iterator, TypeVar, Callable, Dict, Sequence, Mapping, Tuple
 from rl.distribution import Categorical
 from rl.approximate_dynamic_programming import (ValueFunctionApprox,
                                                 QValueFunctionApprox,
@@ -177,3 +177,68 @@ def glie_mc_control(
             q = q.update([((step.state, step.action), step.return_)])
         p = epsilon_greedy_policy(q, mdp, ϵ_as_func_of_episodes(num_episodes))
         yield q
+
+
+def greedy_policy_from_qvf_tabular(
+    q: Mapping[S, Mapping[A, float]]
+) -> DeterministicPolicy[S, A]:
+    '''Return the policy that takes the optimal action at each state based
+    on the given approximation of the process's Q function.
+
+    '''
+
+    def optimal_action(s: S) -> A:
+        a = max(q[NonTerminal(s)], key=q[NonTerminal(s)].get)
+        return a
+    return DeterministicPolicy(optimal_action)
+
+def epsilon_greedy_policy_tabular(
+    q: Mapping[S, Mapping[A, float]],
+    mdp: MarkovDecisionProcess[S, A],
+    ε: float = 0.0
+) -> Policy[S, A]:
+    def explore(s: S, mdp=mdp) -> Iterable[A]:
+        return mdp.actions(NonTerminal(s))
+
+    return RandomPolicy(Categorical(
+        {UniformPolicy(explore): ε,
+         greedy_policy_from_qvf_tabular(q): 1 - ε}
+    ))
+
+def glie_mc_control_tabular(
+    mdp: MarkovDecisionProcess[S, A],
+    states: NTStateDistribution[S],
+    γ: float,
+    ϵ_as_func_of_episodes: Callable[[int], float],
+    episode_length_tolerance: float = 1e-6
+) -> Iterator[Mapping[S, Mapping[A, float]]]:
+    #p: Policy[S, A] = epsilon_greedy_policy(q, mdp, 1.0)
+
+    def explore(s: S, mdp=mdp) -> Iterable[A]:
+        return mdp.actions(NonTerminal(s))
+
+    p: Policy[S,A] = RandomPolicy(Categorical(
+        {UniformPolicy(explore): 1}
+    ))
+
+    q = defaultdict(dict)
+    counter = defaultdict(float)
+    num_episodes: int = 0
+
+    while True:
+        trace: Iterable[TransitionStep[S, A]] = \
+            mdp.simulate_actions(states, p)
+        num_episodes += 1
+        for step in returns(trace, γ, episode_length_tolerance):
+            state = step.state
+            if state not in q:
+                q[state] = defaultdict(float)
+            action = step.action
+            return_ = step.return_
+            q[state][action] += 1 / (counter[(state, action)] + 1) * (return_ - q[state][action])
+            counter[(state, action)] += 1
+
+        p = epsilon_greedy_policy_tabular(q, mdp, ϵ_as_func_of_episodes(num_episodes))
+        yield q
+
+
