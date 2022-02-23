@@ -212,6 +212,72 @@ def glie_sarsa(
             state = next_state
 
 
+def epsilon_greedy_action_tabular(
+    q: Mapping[S, Mapping[A, float]],
+    nt_state: NonTerminal[S],
+    actions: Set[A],
+    ϵ: float
+) -> A:
+    '''
+    given a non-terminal state, a Q-Value Function (in the form of a
+    FunctionApprox: (state, action) -> Value, and epislon, return
+    an action sampled from the probability distribution implied by an
+    epsilon-greedy policy that is derived from the Q-Value Function.
+    '''
+
+    greedy_action: A = max(q[nt_state], key=q[nt_state].get)
+
+    return Categorical(
+        {a: ϵ / len(actions) +
+         (1 - ϵ if a == greedy_action else 0.) for a in actions}
+    ).sample()
+
+
+def glie_sarsa_tabular(
+    mdp: MarkovDecisionProcess[S, A],
+    states: NTStateDistribution[S],
+    γ: float,
+    ϵ_as_func_of_episodes: Callable[[int], float],
+    max_episode_length: int
+) -> Iterator[Mapping[S, Mapping[A, float]]]:
+    num_episodes: int = 0
+
+    q = defaultdict(dict)
+    for s in mdp.non_terminal_states: #only works if finite MDP
+        for a in mdp.actions(s):
+            q[s][a] = 0.
+
+    counter = defaultdict(float)
+    while True:
+        num_episodes += 1
+        ϵ: float = ϵ_as_func_of_episodes(num_episodes)
+        state: NonTerminal[S] = states.sample()
+        action: A = epsilon_greedy_action_tabular(
+            q=q,
+            nt_state=state,
+            actions=set(mdp.actions(state)),
+            ϵ=ϵ
+        )
+        steps: int = 0
+        while isinstance(state, NonTerminal) and steps < max_episode_length:
+            next_state, reward = mdp.step(state, action).sample()
+            if isinstance(next_state, NonTerminal):
+                next_action: A = epsilon_greedy_action_tabular(
+                    q=q,
+                    nt_state=next_state,
+                    actions=set(mdp.actions(next_state)),
+                    ϵ=ϵ
+                )
+                q[state][action] += 1 / (counter[(state, action)] + 1) * (reward + γ * q[next_state][next_action] - q[state][action])
+                action = next_action
+                counter[(state, action)] += 1
+            else:
+                q[state][action] += 1 / (counter[(state, action)] + 1) * (reward - q[state][action])
+                counter[(state, action)] += 1
+            yield q
+            steps += 1
+            state = next_state
+
 PolicyFromQType = Callable[
     [QValueFunctionApprox[S, A], MarkovDecisionProcess[S, A]],
     Policy[S, A]

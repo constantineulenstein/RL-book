@@ -7,6 +7,7 @@ from rl.chapter11.control_utils import \
 from rl.chapter11.control_utils import compare_mc_sarsa_ql
 from rl.chapter3.simple_inventory_mdp_cap import SimpleInventoryMDPCap
 from rl.monte_carlo import glie_mc_control_tabular
+from rl.td import glie_sarsa_tabular
 from rl.approximate_dynamic_programming import NTStateDistribution
 from rl.distribution import Categorical
 
@@ -32,7 +33,7 @@ epsilon_as_func_of_episodes: Callable[[int], float] = lambda k: 1/k
 
 nt_states = si_mdp.non_terminal_states
 state_distribution: NTStateDistribution = Categorical({state: 1/len(nt_states) for state in nt_states})
-
+# Choose(si_mdp.non_terminal_states)
 
 
 i = 0
@@ -50,3 +51,20 @@ for state in episode_qvalue_function:
 
 
 #print(sorted(episode_value_function.items(), key=lambda x: (x[0].state.on_hand, x[0].state.on_order)))
+
+max_episode_length: int = 100
+gamma: float = 0.9
+
+
+i = 0
+for episode_qvalue_function in glie_sarsa_tabular(si_mdp,state_distribution,gamma, epsilon_as_func_of_episodes, max_episode_length):
+    i+=1
+    if i ==100000:
+        break
+
+print(episode_qvalue_function)
+for state in episode_qvalue_function:
+    dictionary = episode_qvalue_function[state]
+    action = max(dictionary, key=dictionary.get)
+    print(f"{state}: {action}")
+
